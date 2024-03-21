@@ -14,47 +14,74 @@ def main():
             password= db_password,
             database='bjboulai'
         )
+    except mysql.connector.Error as e:
+        print("error connecting to mysql", e)
+        return
         
-        print("Select an option:")
-        print("1. Rooms and Rates")
-        print("2. Reservations")
-        print("3. Reservation Cancellation")
-        print("4. Detailed Reservation Information")
-        print("5. Revenue")
-        print("6. Exit")
-        
-        while True:
-            option = input("\nEnter option number: ")
+    print("Select an option:")
+    print("1. Rooms and Rates")
+    print("2. Reservations")
+    print("3. Reservation Cancellation")
+    print("4. Detailed Reservation Information")
+    print("5. Revenue")
+    print("6. Exit")
+    
+    while True:
+        option = input("\nEnter option number: ")
 
-            if option == "1":
-                room_rates(conn)
-            #elif option == "2":
-             #   reservations(conn)
-            elif option == "3":
-                cancel_res(conn)
-            #elif option == "4":
-             #   detailed_reservation_info(conn)
-            #elif option == "5":
-             #   revenue(conn)
-            elif option == "6":
-                break
-            else:
-                print("Invalid option. Please try again.")
-    finally: 
+        if option == "1":
+            room_rates(conn)
+        elif option == "2":
+            reservations(conn)
+        elif option == "3":
+            cancel_res(conn)
+        #elif option == "4":
+            #   detailed_reservation_info(conn)
+        #elif option == "5":
+            #   revenue(conn)
+        elif option == "6":
+            break
+        else:
+            print("Invalid option. Please try again.")
+
         conn.close()
 
 
 def room_rates(conn):
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT r.RoomCode, r.RoomName,
-            ROUND((SELECT COUNT(*) FROM lab7_reservations WHERE Room = r.RoomCode AND CheckIn BETWEEN DATE_SUB(CURDATE(), INTERVAL 180 DAY) AND CURDATE()) / 180, 2) AS PopularityScore,
-            (SELECT MIN(CheckIn) FROM lab7_reservations WHERE Room = r.RoomCode AND CheckIn > CURDATE()) AS NextCheckIn,
-            (SELECT DATEDIFF(Checkout, CheckIn) FROM lab7_reservations WHERE Room = r.RoomCode AND CheckOut < CURDATE() ORDER BY CheckOut DESC LIMIT 1) AS LengthOfMostRecentStay
-        FROM
-            lab7_rooms r
-        ORDER BY
-            PopularityScore DESC;
+        select r.roomcode, r.roomname,
+            round(sum(datediff(res.checkout, res.checkin)) / 180, 2) as PopularityScore,
+            mindate as NextAvailableDate,
+            max(stay.checkout) as LastStay,
+            max(stay.length) as LengthOfStay
+        from lab7_rooms r
+        left outer join lab7_reservations res on res.room = r.roomcode and
+            res.checkin >= date_sub(curdate(), interval 180 day) and
+            res.checkout <= curdate()
+        join (
+            select dates.room, min(potentialdate) as mindate
+            from (
+                select checkout as potentialdate, room
+                from lab7_reservations
+                where checkout >= curdate()
+                union all
+                select curdate() as potentialdate, roomcode as room
+                from lab7_rooms
+                group by room
+            ) as dates
+            left outer join lab7_reservations res2 on dates.room = res2.room and
+                dates.potentialdate between res2.checkin and date_sub(res2.checkout, interval 1 day)
+            where res2.room is null
+            group by dates.room
+        ) as mindates on mindates.room = r.roomcode
+        join (
+            select res.room, datediff(res.checkout, res.checkin) as length, res.checkout
+            from lab7_reservations res
+            where checkout = (select max(checkout) from lab7_reservations res1 where checkout <= curdate() and res.room = res1.room)
+        ) as stay on stay.room = r.roomcode
+        group by r.roomcode
+        order by PopularityScore desc;
     """)
 
     # Fetch all rows from the result
