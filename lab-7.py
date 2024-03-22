@@ -253,4 +253,3 @@ def revenue(conn):
 
 if __name__ == "__main__":
     main()
-    # 365-w24-027257145
