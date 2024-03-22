@@ -35,8 +35,8 @@ def main():
             reservations(conn)
         elif option == "3":
             cancel_res(conn)
-        #elif option == "4":
-            #detailed_reservation_info(conn)
+        elif option == "4":
+            detailed_res_info(conn)
         elif option == "5":
            revenue(conn)
         elif option == "6":
@@ -44,7 +44,7 @@ def main():
         else:
             print("Invalid option. Please try again.")
 
-        conn.close()
+    conn.close()
 
 
 def room_rates(conn):
@@ -144,6 +144,47 @@ def cancel_res(conn):
 def detailed_res_info(conn):
     cursor = conn.cursor()
 
+    print("Search for reservations (leave blank for Any)")
+    first_name = input("First name: ")
+    last_name = input("Last name: ")
+    room_code = input("Room code: ")
+    res_code = input("Reservation code: ")
+    try:
+        begin_date = datetime.strptime(input("Begin date of stay (YYYY-MM-DD): "), "%Y-%m-%d")
+        end_date = datetime.strptime(input("End date of stay (YYYY-MM-DD): "), "%Y-%m-%d")
+    except ValueError:
+        print("invalid date")
+        return
+
+    if not first_name.strip():
+        first_name = "%"
+    if not last_name.strip():
+        last_name = "%"
+    if not room_code.strip():
+        room_code = "%"
+    if not res_code.strip():
+        res_code = "%"
+        
+    cursor.execute("""
+        select r.roomname, res.*
+        from lab7_reservations res
+        join lab7_rooms r on res.room = r.roomcode
+        where res.firstname like %s and
+            res.lastname like %s and
+            res.checkin between %s and %s and
+            res.checkout between %s and %s and
+            res.room like %s and
+            res.code like %s;
+    """, [first_name, last_name, begin_date, end_date, begin_date, end_date, room_code, res_code])
+
+    # Fetch all rows from the result
+    rows = cursor.fetchall()
+
+    # Create a DataFrame from the fetched rows
+    df = pd.DataFrame(rows, columns=[col[0] for col in cursor.description])
+
+    print(df)
+    
     cursor.close()
 
 def revenue(conn):
