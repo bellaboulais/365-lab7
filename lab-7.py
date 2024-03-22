@@ -306,15 +306,11 @@ def detailed_res_info(conn):
         res.room like %s and
         res.code like %s;
     """
-
-    # Modify the execute call to handle None values properly
     cursor.execute(query, [first_name, last_name, begin_date, begin_date, end_date,
                     end_date, room_code, res_code])
 
-    # Fetch all rows from the result
     rows = cursor.fetchall()
 
-    # Create a DataFrame from the fetched rows
     df = pd.DataFrame(rows, columns=[col[0] for col in cursor.description])
 
     print(df)
