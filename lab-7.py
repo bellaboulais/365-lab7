@@ -105,8 +105,8 @@ def reservations(conn):
     last_name = input("Last name: ")
     room_code = input("Room code (or 'Any' for no preference): ")
     bed_type = input("Bed type (or 'Any' for no preference): ")
-    begin_date = datetime.strptime(input("Begin date of stay (YYYY-MM-DD): "), "%Y-%m-%d")
-    end_date = datetime.strptime(input("End date of stay (YYYY-MM-DD): "), "%Y-%m-%d")
+    begin_date = input("Begin date of stay (YYYY-MM-DD): ")
+    end_date = input("End date of stay (YYYY-MM-DD): ")
     num_children = int(input("Number of children: "))
     num_adults = int(input("Number of adults: "))
     total_persons = num_children + num_adults
@@ -127,13 +127,14 @@ def reservations(conn):
     AND r.RoomCode NOT IN (
        SELECT res.Room
        FROM lab7_reservations res
-       WHERE NOT (
-           res.CheckIn >= %s OR
-           res.CheckOut <= %s
-       )
+       WHERE  res.CheckIn BETWEEN %s AND %s OR 
+           res.CheckOut BETWEEN %s AND %s
     )"""
     
-    cursor.execute(query, (room_code, room_code, bed_type, bed_type, num_children, num_adults, end_date, begin_date))
+    cursor.execute(query, (room_code, room_code, bed_type, bed_type, 
+                           num_children, num_adults,
+                           begin_date, end_date,
+                           begin_date, end_date))
 
     # Fetch all rows from the result
     rows = cursor.fetchall()
@@ -193,8 +194,8 @@ def reservations(conn):
     print(f"Room code: {selected_room[0]}")
     print(f"Room name: {selected_room[1]}")
     print(f"Bed type: {selected_room[3]}")
-    print(f"Begin date of stay: {begin_date.strftime('%Y-%m-%d')}")
-    print(f"End date of stay: {end_date.strftime('%Y-%m-%d')}")
+    print(f"Begin date of stay: {begin_date}")
+    print(f"End date of stay: {end_date}")
     print(f"Number of adults: {num_adults}")
     print(f"Number of children: {num_children}")
     print(f"Total cost of stay: ${total_cost}")
@@ -214,6 +215,8 @@ def generate_unique_code(cursor):
     
 def calculate_total_cost(base_price, checkin_date, checkout_date):
     total_cost = 0
+    checkin_date = datetime.strptime(checkin_date, "%Y-%m-%d")
+    checkout_date = datetime.strptime(checkout_date, "%Y-%m-%d")
     current_date = checkin_date
     while current_date < checkout_date:
         if current_date.weekday() < 5: 
@@ -308,13 +311,19 @@ def detailed_res_info(conn):
     join lab7_rooms r on res.room = r.roomcode
     where res.firstname like %s and
         res.lastname like %s and
-        (%s is null or (res.checkin <= %s and res.checkin >= %s)) OR
-        (%s is null or (res.checkout > %s and res.checkout <= %s)) OR
-        (res.checkin <= %s and res.checkout >= %s) and
+        ((%s is null) or 
+        (res.checkin <= %s and res.checkin >= %s) or
+        (%s is null) or 
+        (res.checkout > %s and res.checkout < %s) or
+        (res.checkin <= %s and res.checkout >= %s)) and
         res.room like %s and
         res.code like %s;
     """
-
+    print([first_name, last_name, 
+                    begin_date, end_date, begin_date,
+                    end_date, begin_date, end_date, 
+                    begin_date, end_date, 
+                    room_code, res_code])
     cursor.execute(query, [first_name, last_name, 
                     begin_date, end_date, begin_date,
                     end_date, begin_date, end_date, 
