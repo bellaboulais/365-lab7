@@ -36,9 +36,9 @@ def main():
         elif option == "3":
             cancel_res(conn)
         #elif option == "4":
-            #   detailed_reservation_info(conn)
-        #elif option == "5":
-            #   revenue(conn)
+            #detailed_reservation_info(conn)
+        elif option == "5":
+           revenue(conn)
         elif option == "6":
             break
         else:
@@ -141,10 +141,72 @@ def cancel_res(conn):
 
     cursor.close()
 
-#def deatiled_res_info(conn):
+def detailed_res_info(conn):
+    cursor = conn.cursor()
 
-#def revenue(conn):
+    cursor.close()
 
+def revenue(conn):
+    cursor = conn.cursor()
+    month_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    result = []
+    for i in range(len(month_names)):
+        cursor.execute("""
+            with month as (
+                select roomname,
+                    sum(
+                        case
+                            when month(res.checkin) = month(res.checkout) then datediff(res.checkout, res.checkin) * baseprice
+                            when month(res.checkout) > %s then
+                                datediff(
+                                    least(last_day(date_format(curdate(), '%%Y-%02d-01')), res.checkout),
+                                    greatest(date_format(curdate(), '%%Y-%02d-01'), res.checkin)
+                                    ) * baseprice + baseprice
+                            when month(res.checkout) = %s then datediff(
+                                    res.checkout,
+                                    greatest(date_format(curdate(), '%%Y-%02d-01'), res.checkin)
+                                    ) * baseprice
+                            else 0
+                        end
+                    ) as total
+                from lab7_rooms
+                left outer join (select * from lab7_reservations where month(checkin) <= %s and month(checkout) >= %s and year(checkout) = year(curdate())) res on room = roomcode
+                group by roomcode
+            )
+            select 
+                month.roomname, 
+                month.total as %s
+            from month
+            order by roomname
+        """ % (i + 1, i + 1, i + 1, i + 1, i + 1, i + 1, i + 1, month_names[i]))
+
+        # Fetch all rows from the result
+        fetched = cursor.fetchall()
+        rows = [row[1] for row in fetched]
+
+        # get roomnames
+        rooms = [row[0] for row in fetched]
+
+        # append month result to results list
+        result.append(rows)
+
+    # Convert to DataFrame
+    df = pd.DataFrame(result).transpose()
+
+    # Transpose the DataFrame
+    df.columns = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+    # Add the roomnames
+    df.insert(0, "Room Names", rooms)
+
+    # Add the totals
+    totals = [sum(month) for month in result]
+    totals.insert(0, "totals")
+    df.loc[len(df)] = totals
+
+    print(df)
+
+    cursor.close()
 
 if __name__ == "__main__":
     main()
