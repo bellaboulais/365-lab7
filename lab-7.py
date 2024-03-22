@@ -282,16 +282,23 @@ def detailed_res_info(conn):
     cursor = conn.cursor()
 
     print("Search for reservations (leave blank for Any)")
-    first_name = input("First name: ") + "%"
-    last_name = input("Last name: ") + "%"
-    room_code = input("Room code: ") + "%"
-    res_code = input("Reservation code: ") + "%"
-    begin_date = input("Begin date of stay (YYYY-MM-DD): ") 
-    end_date = input("End date of stay (YYYY-MM-DD): ")
+    first_name = input("First name: ") 
+    last_name = input("Last name: ") 
+    room_code = input("Room code: ") 
+    res_code = input("Reservation code: ") 
+    begin_date = input("Start date of range (YYYY-MM-DD): ") 
+    end_date = input("End date of range (YYYY-MM-DD): ")
         
+    if not first_name.strip():
+        first_name = "%"
+    if not last_name.strip():
+        last_name = "%"
+    if not room_code.strip():
+        room_code = "%"
+    if not res_code.strip():
+        res_code = "%"
     if not begin_date.strip():
        begin_date = None
-      
     if not end_date.strip():
        end_date = None
         
@@ -301,13 +308,18 @@ def detailed_res_info(conn):
     join lab7_rooms r on res.room = r.roomcode
     where res.firstname like %s and
         res.lastname like %s and
-        (%s is null or res.checkin = %s) and
-        (%s is null or res.checkout = %s) and
+        (%s is null or (res.checkin <= %s and res.checkin >= %s)) OR
+        (%s is null or (res.checkout > %s and res.checkout <= %s)) OR
+        (res.checkin <= %s and res.checkout >= %s) and
         res.room like %s and
         res.code like %s;
     """
-    cursor.execute(query, [first_name, last_name, begin_date, begin_date, end_date,
-                    end_date, room_code, res_code])
+
+    cursor.execute(query, [first_name, last_name, 
+                    begin_date, end_date, begin_date,
+                    end_date, begin_date, end_date, 
+                    begin_date, end_date, 
+                    room_code, res_code])
 
     rows = cursor.fetchall()
 
