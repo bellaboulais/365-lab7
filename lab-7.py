@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 def main():     
     db_password = getpass.getpass()
-
+    
     try: 
         # Connect to the database
         conn = mysql.connector.connect(
@@ -290,24 +290,26 @@ def detailed_res_info(conn):
     end_date = input("End date of stay (YYYY-MM-DD): ")
         
     if not begin_date.strip():
-        begin_date = None
-        
+       begin_date = None
+      
     if not end_date.strip():
-        end_date = None
+       end_date = None
         
     query = """
-        select r.roomname, res.*
-        from lab7_reservations res
-        join lab7_rooms r on res.room = r.roomcode
-        where res.firstname like %s and
-            res.lastname like %s and
-            (%s is null or res.checkin between %s and %s) and
-            (%s is null or res.checkout between %s and %s) and
-            res.room like %s and
-            res.code like %s;
+    select r.roomname, res.*
+    from lab7_reservations res
+    join lab7_rooms r on res.room = r.roomcode
+    where res.firstname like %s and
+        res.lastname like %s and
+        (%s is null or res.checkin = %s) and
+        (%s is null or res.checkout = %s) and
+        res.room like %s and
+        res.code like %s;
     """
+
+    # Modify the execute call to handle None values properly
     cursor.execute(query, [first_name, last_name, begin_date, begin_date, end_date,
-                           end_date, begin_date, end_date, room_code, res_code])
+                    end_date, room_code, res_code])
 
     # Fetch all rows from the result
     rows = cursor.fetchall()
