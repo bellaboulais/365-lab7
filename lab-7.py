@@ -1,7 +1,10 @@
 import mysql.connector
 import getpass
 import pandas as pd
+import random
+import string
 from datetime import datetime, timedelta
+
 
 def main():     
     db_password = getpass.getpass()
@@ -106,9 +109,143 @@ def reservations(conn):
     end_date = datetime.strptime(input("End date of stay (YYYY-MM-DD): "), "%Y-%m-%d")
     num_children = int(input("Number of children: "))
     num_adults = int(input("Number of adults: "))
+    total_persons = num_children + num_adults
     
+    cursor.execute("SELECT MAX(maxOcc) FROM lab7_rooms")
+    max_capacity = cursor.fetchone()[0]
+    if total_persons > max_capacity:
+       print("No suitable rooms available. Requested person count exceeds maximum capacity of any room.")
+       return
     
+    # SQL query to retrieve available rooms
+    query = """
+    SELECT r.RoomCode, r.RoomName, r.Beds, r.bedType, r.maxOcc, r.basePrice, r.decor
+    FROM lab7_rooms r
+    WHERE r.RoomCode = %s OR %s = 'Any'
+    AND r.bedType = %s OR %s = 'Any'
+    AND r.maxOcc >= %s + %s
+    AND r.RoomCode NOT IN (
+       SELECT res.Room
+       FROM lab7_reservations res
+       WHERE NOT (
+           res.CheckIn >= %s OR
+           res.CheckOut <= %s
+       )
+    )"""
+    
+    cursor.execute(query, (room_code, room_code, bed_type, bed_type, num_children, num_adults, end_date, begin_date))
+
+    # Fetch all rows from the result
+    rows = cursor.fetchall()
+
+    if len(rows) == 0:
+       # No exact matches found, suggest 5 possibilities
+       print("No exact matches found. Suggesting 5 possibilities:")
+       suggested_rooms = get_suggested_rooms(conn, room_code, bed_type, total_persons, begin_date, end_date)
+       for i, room in enumerate(suggested_rooms, start=1):
+           print(f"{i}. {room[1]} ({room[2]} {room[3]}, {room[4]} max occupancy, ${room[5]} per night)")
+
+       return
+
+    # Display a numbered list of available rooms
+    print("Available rooms:")
+    for i, row in enumerate(rows):
+        print(f"{i+1}. {row[1]} ({row[2]} {row[3]}, {row[4]} max occupancy, ${row[5]} per night)")
+
+    # Prompt user to select a room
+    while True:
+        try:
+            choice = int(input("Select a room number to book (or 0 to cancel): "))
+            if choice == 0:
+                print("Reservation cancelled.")
+                return
+            elif choice < 1 or choice > len(rows):
+                raise ValueError
+            else:
+                selected_room = rows[choice - 1]
+                break
+        except ValueError:
+            print("Invalid choice. Please enter a valid room number.")
+
+    total_cost = calculate_total_cost(selected_room[4], begin_date, end_date)
+    code = random.randint(10000, 99999)
+    while True:
+        cursor.execute("SELECT * FROM lab7_reservations WHERE CODE = %s", (code,))
+        if cursor.fetchone() is None:
+            break
+        else:
+            code = random.randint(10000, 99999)
+
+    confirm = input(f"Confirm booking room {selected_room[1]} for ${total_cost} (y/n): ")
+    if confirm.lower() != 'y':
+        print("Reservation cancelled.")
+        return
+
+    cursor.execute("""
+        INSERT INTO lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (code, selected_room[0], begin_date, end_date, selected_room[4], last_name, first_name, num_adults, num_children))
+    conn.commit()
+
+    print("\nConfirmation:")
+    print(f"First name: {first_name}")
+    print(f"Last name: {last_name}")
+    print(f"Room code: {selected_room[0]}")
+    print(f"Room name: {selected_room[1]}")
+    print(f"Bed type: {selected_room[3]}")
+    print(f"Begin date of stay: {begin_date.strftime('%Y-%m-%d')}")
+    print(f"End date of stay: {end_date.strftime('%Y-%m-%d')}")
+    print(f"Number of adults: {num_adults}")
+    print(f"Number of children: {num_children}")
+    print(f"Total cost of stay: ${total_cost}")
+
     cursor.close()
+    
+def generate_unique_code(cursor):
+    # Generate a unique reservation code for the reservation
+    code = random.randint(10000, 99999)
+    while True:
+        cursor.execute("SELECT * FROM lab7_reservations WHERE CODE = %s", (code,))
+        if cursor.fetchone() is None:
+            break
+        else:
+            code = random.randint(10000, 99999)
+    return code
+    
+def calculate_total_cost(base_price, checkin_date, checkout_date):
+    total_cost = 0
+    current_date = checkin_date
+    while current_date < checkout_date:
+        if current_date.weekday() < 5: 
+            total_cost += base_price
+        else: 
+            total_cost += base_price * 1.10
+        current_date += timedelta(days=1)
+    return round(total_cost, 2)    
+
+def get_suggested_rooms(conn, room_code, bed_type, total_persons, begin_date, end_date):
+   cursor = conn.cursor()
+
+   # SQL query to get suggested rooms based on similarity
+   query = """
+   SELECT r.RoomCode, r.RoomName, r.Beds, r.bedType, r.maxOcc, r.basePrice, r.decor
+   FROM lab7_rooms r
+   WHERE r.maxOcc >= %s
+   AND r.RoomCode NOT IN (
+       SELECT res.Room
+       FROM lab7_reservations res
+       WHERE NOT (
+           res.CheckIn >= %s OR
+           res.CheckOut <= %s
+       )
+   )
+   LIMIT 5
+   """
+   cursor.execute(query, (total_persons, end_date, begin_date))
+   suggested_rooms = cursor.fetchall()
+
+   cursor.close()
+   return suggested_rooms
       
 def cancel_res(conn):
     cursor = conn.cursor()
@@ -145,37 +282,32 @@ def detailed_res_info(conn):
     cursor = conn.cursor()
 
     print("Search for reservations (leave blank for Any)")
-    first_name = input("First name: ")
-    last_name = input("Last name: ")
-    room_code = input("Room code: ")
-    res_code = input("Reservation code: ")
-    try:
-        begin_date = datetime.strptime(input("Begin date of stay (YYYY-MM-DD): "), "%Y-%m-%d")
-        end_date = datetime.strptime(input("End date of stay (YYYY-MM-DD): "), "%Y-%m-%d")
-    except ValueError:
-        print("invalid date")
-        return
-
-    if not first_name.strip():
-        first_name = "%"
-    if not last_name.strip():
-        last_name = "%"
-    if not room_code.strip():
-        room_code = "%"
-    if not res_code.strip():
-        res_code = "%"
+    first_name = input("First name: ") + "%"
+    last_name = input("Last name: ") + "%"
+    room_code = input("Room code: ") + "%"
+    res_code = input("Reservation code: ") + "%"
+    begin_date = input("Begin date of stay (YYYY-MM-DD): ") 
+    end_date = input("End date of stay (YYYY-MM-DD): ")
         
-    cursor.execute("""
+    if not begin_date.strip():
+        begin_date = None
+        
+    if not end_date.strip():
+        end_date = None
+        
+    query = """
         select r.roomname, res.*
         from lab7_reservations res
         join lab7_rooms r on res.room = r.roomcode
         where res.firstname like %s and
             res.lastname like %s and
-            res.checkin between %s and %s and
-            res.checkout between %s and %s and
+            (%s is null or res.checkin between %s and %s) and
+            (%s is null or res.checkout between %s and %s) and
             res.room like %s and
             res.code like %s;
-    """, [first_name, last_name, begin_date, end_date, begin_date, end_date, room_code, res_code])
+    """
+    cursor.execute(query, [first_name, last_name, begin_date, begin_date, end_date,
+                           end_date, begin_date, end_date, room_code, res_code])
 
     # Fetch all rows from the result
     rows = cursor.fetchall()
@@ -253,3 +385,4 @@ def revenue(conn):
 
 if __name__ == "__main__":
     main()
+
