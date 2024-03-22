@@ -204,6 +204,8 @@ def revenue(conn):
     totals.insert(0, "totals")
     df.loc[len(df)] = totals
 
+    df["Yearly Total"] = df.iloc[:, 1:].sum(axis=1)
+
     print(df)
 
     cursor.close()
