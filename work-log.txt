@@ -1,7 +1,7 @@
 Bella:
 - Python SQL connection ~ 10 mins
-- FR2 & FR3 ~ 1.5 hours
-- Debugging FR2 & FR4 ~ 2 hours
+- FR2 & FR3 ~ 2 hours
+- Debugging FR2 & FR4 ~ 3 hours
 
 Andrew:
 - FR 1 ~ 2 hours
