@@ -7,3 +7,4 @@ Bella Boulais, Andrew Chan, Melanie Huang
 'python3 lab7.py'
 
 ## Known bugs / deficiences
+None known
