@@ -1,5 +1,5 @@
 Bella:
-- FR2 & FR3 ~ 2 hours
+- FR2 & FR3 ~ 3 hours
 - Debugging FR2 & FR4 ~ 3 hours
 
 Andrew:
@@ -9,4 +9,6 @@ Andrew:
 
 Melanie:
 - Python SQL connection ~ 1 hour
+- Testing with SQL queries in threesixfive ~ 3 hours
+- FR2 ~ 1 hours
 
