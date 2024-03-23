@@ -58,30 +58,30 @@ def room_rates(conn):
             mindate as NextAvailableDate,
             max(stay.checkout) as LastStay,
             max(stay.length) as LengthOfStay
-        from lab7_rooms r
-        left outer join lab7_reservations res on res.room = r.roomcode and
+        from bjboulai.lab7_rooms r
+        left outer join bjboulai.lab7_reservations res on res.room = r.roomcode and
             res.checkin >= date_sub(curdate(), interval 180 day) and
             res.checkout <= curdate()
         join (
             select dates.room, min(potentialdate) as mindate
             from (
                 select checkout as potentialdate, room
-                from lab7_reservations
+                from bjboulai.lab7_reservations
                 where checkout >= curdate()
                 union all
                 select curdate() as potentialdate, roomcode as room
-                from lab7_rooms
+                from bjboulai.lab7_rooms
                 group by room
             ) as dates
-            left outer join lab7_reservations res2 on dates.room = res2.room and
+            left outer join bjboulai.lab7_reservations res2 on dates.room = res2.room and
                 dates.potentialdate between res2.checkin and date_sub(res2.checkout, interval 1 day)
             where res2.room is null
             group by dates.room
         ) as mindates on mindates.room = r.roomcode
         join (
             select res.room, datediff(res.checkout, res.checkin) as length, res.checkout
-            from lab7_reservations res
-            where checkout = (select max(checkout) from lab7_reservations res1 where checkout <= curdate() and res.room = res1.room)
+            from bjboulai.lab7_reservations res
+            where checkout = (select max(checkout) from bjboulai.lab7_reservations res1 where checkout <= curdate() and res.room = res1.room)
         ) as stay on stay.room = r.roomcode
         group by r.roomcode
         order by PopularityScore desc;
@@ -112,7 +112,7 @@ def reservations(conn):
     total_persons = num_children + num_adults
     
     # check if total_persons is too much for all rooms
-    cursor.execute("SELECT MAX(maxOcc) FROM lab7_rooms")
+    cursor.execute("SELECT MAX(maxOcc) FROM bjboulai.lab7_rooms")
     max_capacity = cursor.fetchone()[0]
     if total_persons > max_capacity:
        print("No suitable rooms available. Requested person count exceeds maximum capacity of any room.")
@@ -121,13 +121,13 @@ def reservations(conn):
     # SQL query to retrieve available rooms
     query = """
     SELECT r.RoomCode, r.RoomName, r.Beds, r.bedType, r.maxOcc, r.basePrice, r.decor
-    FROM lab7_rooms r
+    FROM bjboulai.lab7_rooms r
     WHERE (r.RoomCode = %s OR %s = 'Any')
     AND (r.bedType = %s OR %s = 'Any')
     AND (r.maxOcc >= %s + %s)
     AND r.RoomCode NOT IN (
        SELECT res.Room
-       FROM lab7_reservations res
+       FROM bjboulai.lab7_reservations res
        WHERE  (res.CheckIn BETWEEN %s AND %s) OR 
            (res.CheckOut BETWEEN %s AND %s)
     )"""
@@ -192,7 +192,7 @@ def reservations(conn):
     total_cost = calculate_total_cost(selected_room[4], begin_date, end_date)
     code = random.randint(10000, 99999)
     while True:
-        cursor.execute("SELECT * FROM lab7_reservations WHERE CODE = %s", (code,))
+        cursor.execute("SELECT * FROM bjboulai.lab7_reservations WHERE CODE = %s", (code,))
         if cursor.fetchone() is None:
             break
         else:
@@ -204,7 +204,7 @@ def reservations(conn):
         return
 
     cursor.execute("""
-        INSERT INTO lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids)
+        INSERT INTO bjboulai.lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (code, selected_room[0], begin_date, end_date, selected_room[4], last_name, first_name, num_adults, num_children))
     conn.commit()
@@ -242,11 +242,11 @@ def get_suggested_rooms(conn, room_code, bed_type, total_persons, begin_date, en
    # SQL query to get suggested rooms based on similarity
    query = """
    SELECT r.RoomCode, r.RoomName, r.Beds, r.bedType, r.maxOcc, r.basePrice, r.decor
-   FROM lab7_rooms r
+   FROM bjboulai.lab7_rooms r
    WHERE r.maxOcc >= %s
    AND r.RoomCode NOT IN (
        SELECT res.Room
-       FROM lab7_reservations res
+       FROM bjboulai.lab7_reservations res
        WHERE  (res.CheckIn BETWEEN %s AND %s) OR 
            (res.CheckOut BETWEEN %s AND %s)
    )
@@ -262,7 +262,7 @@ def cancel_res(conn):
     cursor = conn.cursor()
     reservation_code = input("Enter reservation code to cancel: ")
 
-    cursor.execute("SELECT * FROM lab7_reservations WHERE CODE = %s", (reservation_code,))
+    cursor.execute("SELECT * FROM bjboulai.lab7_reservations WHERE CODE = %s", (reservation_code,))
     reservation = cursor.fetchone()
     if reservation is None:
         print("Reservation not found.")
@@ -281,7 +281,7 @@ def cancel_res(conn):
 
     if confirm.lower() == 'y':
         # Remove reservation record from the database
-        cursor.execute("DELETE FROM lab7_reservations WHERE CODE = %s", (reservation_code,))
+        cursor.execute("DELETE FROM bjboulai.lab7_reservations WHERE CODE = %s", (reservation_code,))
         conn.commit()
         print("Reservation successfully cancelled.")
     else:
@@ -315,8 +315,8 @@ def detailed_res_info(conn):
         
     query = """
     select r.roomname, res.*
-    from lab7_reservations res
-    join lab7_rooms r on res.room = r.roomcode
+    from bjboulai.lab7_reservations res
+    join bjboulai.lab7_rooms r on res.room = r.roomcode
     where res.firstname like %s and
         res.lastname like %s and
          ((%s is null) or 
@@ -368,8 +368,8 @@ def revenue(conn):
                             else 0
                         end
                     ) as total
-                from lab7_rooms
-                left outer join (select * from lab7_reservations where month(checkin) <= %s and month(checkout) >= %s and year(checkout) = year(curdate())) res on room = roomcode
+                from bjboulai.lab7_rooms
+                left outer join (select * from bjboulai.lab7_reservations where month(checkin) <= %s and month(checkout) >= %s and year(checkout) = year(curdate())) res on room = roomcode
                 group by roomcode
             )
             select 
