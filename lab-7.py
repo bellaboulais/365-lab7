@@ -319,11 +319,11 @@ def detailed_res_info(conn):
     join lab7_rooms r on res.room = r.roomcode
     where res.firstname like %s and
         res.lastname like %s and
-        ((%s is null) or 
-        (res.checkin <= %s and res.checkin >= %s) or
+         ((%s is null) or 
+        (res.checkin < %s and res.checkout >= %s) or
         (%s is null) or 
-        (res.checkout > %s and res.checkout < %s) or
-        (res.checkin <= %s and res.checkout >= %s)) and
+        (res.checkout > %s and res.checkin < %s) or
+        (res.checkin >= %s and res.checkout <= %s)) and
         res.room like %s and
         res.code like %s;
     """
@@ -338,7 +338,10 @@ def detailed_res_info(conn):
 
     df = pd.DataFrame(rows, columns=[col[0] for col in cursor.description])
 
-    print(df)
+    if df.empty:
+        print("No reservations matching that query")
+    else:
+        print(df)
     
     cursor.close()
 
