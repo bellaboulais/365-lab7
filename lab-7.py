@@ -2,7 +2,6 @@ import mysql.connector
 import getpass
 import pandas as pd
 import random
-import string
 from datetime import datetime, timedelta
 
 
@@ -29,6 +28,7 @@ def main():
     print("5. Revenue")
     print("6. Exit")
     
+    # Receive user input
     while True:
         option = input("\nEnter option number: ")
 
@@ -111,6 +111,7 @@ def reservations(conn):
     num_adults = int(input("Number of adults: "))
     total_persons = num_children + num_adults
     
+    # check if total_persons is too much for all rooms
     cursor.execute("SELECT MAX(maxOcc) FROM lab7_rooms")
     max_capacity = cursor.fetchone()[0]
     if total_persons > max_capacity:
@@ -136,7 +137,6 @@ def reservations(conn):
                            begin_date, end_date,
                            begin_date, end_date))
 
-    # Fetch all rows from the result
     rows = cursor.fetchall()
 
     if len(rows) == 0:
@@ -188,6 +188,7 @@ def reservations(conn):
             except ValueError:
                 print("Invalid choice. Please enter a valid room number.")
 
+    # calculate total cost and get unique reservation code
     total_cost = calculate_total_cost(selected_room[4], begin_date, end_date)
     code = random.randint(10000, 99999)
     while True:
