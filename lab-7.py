@@ -121,14 +121,14 @@ def reservations(conn):
     query = """
     SELECT r.RoomCode, r.RoomName, r.Beds, r.bedType, r.maxOcc, r.basePrice, r.decor
     FROM lab7_rooms r
-    WHERE r.RoomCode = %s OR %s = 'Any'
-    AND r.bedType = %s OR %s = 'Any'
-    AND r.maxOcc >= %s + %s
+    WHERE (r.RoomCode = %s OR %s = 'Any')
+    AND (r.bedType = %s OR %s = 'Any')
+    AND (r.maxOcc >= %s + %s)
     AND r.RoomCode NOT IN (
        SELECT res.Room
        FROM lab7_reservations res
-       WHERE  res.CheckIn BETWEEN %s AND %s OR 
-           res.CheckOut BETWEEN %s AND %s
+       WHERE  (res.CheckIn BETWEEN %s AND %s) OR 
+           (res.CheckOut BETWEEN %s AND %s)
     )"""
     
     cursor.execute(query, (room_code, room_code, bed_type, bed_type, 
@@ -140,33 +140,53 @@ def reservations(conn):
     rows = cursor.fetchall()
 
     if len(rows) == 0:
-       # No exact matches found, suggest 5 possibilities
-       print("No exact matches found. Suggesting 5 possibilities:")
-       suggested_rooms = get_suggested_rooms(conn, room_code, bed_type, total_persons, begin_date, end_date)
-       for i, room in enumerate(suggested_rooms, start=1):
-           print(f"{i}. {room[1]} ({room[2]} {room[3]}, {room[4]} max occupancy, ${room[5]} per night)")
+        # No exact matches found, suggest 5 possibilities
+        print("No exact matches found. Suggesting 5 possibilities:")
+        suggested_rooms = get_suggested_rooms(conn, room_code, bed_type, total_persons, begin_date, end_date)
+        
+        if len(suggested_rooms) == 0:
+            print("No rooms match your search. Please try again.")
+            return
+        else:
+            print("No exact matches found. Suggesting 5 possibilities:")
+            for i, room in enumerate(suggested_rooms, start=1):
+                print(f"{i}. {room[1]} ({room[2]} {room[3]}, {room[4]} max occupancy, ${room[5]} per night)")
+        
+        while True:
+            try:
+                choice = int(input("Select a room number to book (or 0 to cancel): "))
+                if choice == 0:
+                    print("Reservation cancelled.")
+                    return
+                elif choice < 1 or choice > len(suggested_rooms):
+                    raise ValueError
+                else:
+                    selected_room = suggested_rooms[choice - 1]
+                    break
+            except ValueError:
+                print("Invalid choice. Please enter a valid room number.")
 
-       return
 
-    # Display a numbered list of available rooms
-    print("Available rooms:")
-    for i, row in enumerate(rows):
-        print(f"{i+1}. {row[1]} ({row[2]} {row[3]}, {row[4]} max occupancy, ${row[5]} per night)")
+    else: 
+        # Display a numbered list of available rooms
+        print("Available rooms:")
+        for i, row in enumerate(rows):
+            print(f"{i+1}. {row[1]} ({row[2]} {row[3]}, {row[4]} max occupancy, ${row[5]} per night)")
 
-    # Prompt user to select a room
-    while True:
-        try:
-            choice = int(input("Select a room number to book (or 0 to cancel): "))
-            if choice == 0:
-                print("Reservation cancelled.")
-                return
-            elif choice < 1 or choice > len(rows):
-                raise ValueError
-            else:
-                selected_room = rows[choice - 1]
-                break
-        except ValueError:
-            print("Invalid choice. Please enter a valid room number.")
+        # Prompt user to select a room
+        while True:
+            try:
+                choice = int(input("Select a room number to book (or 0 to cancel): "))
+                if choice == 0:
+                    print("Reservation cancelled.")
+                    return
+                elif choice < 1 or choice > len(rows):
+                    raise ValueError
+                else:
+                    selected_room = rows[choice - 1]
+                    break
+            except ValueError:
+                print("Invalid choice. Please enter a valid room number.")
 
     total_cost = calculate_total_cost(selected_room[4], begin_date, end_date)
     code = random.randint(10000, 99999)
@@ -202,17 +222,6 @@ def reservations(conn):
 
     cursor.close()
     
-def generate_unique_code(cursor):
-    # Generate a unique reservation code for the reservation
-    code = random.randint(10000, 99999)
-    while True:
-        cursor.execute("SELECT * FROM lab7_reservations WHERE CODE = %s", (code,))
-        if cursor.fetchone() is None:
-            break
-        else:
-            code = random.randint(10000, 99999)
-    return code
-    
 def calculate_total_cost(base_price, checkin_date, checkout_date):
     total_cost = 0
     checkin_date = datetime.strptime(checkin_date, "%Y-%m-%d")
@@ -237,14 +246,12 @@ def get_suggested_rooms(conn, room_code, bed_type, total_persons, begin_date, en
    AND r.RoomCode NOT IN (
        SELECT res.Room
        FROM lab7_reservations res
-       WHERE NOT (
-           res.CheckIn >= %s OR
-           res.CheckOut <= %s
-       )
+       WHERE  (res.CheckIn BETWEEN %s AND %s) OR 
+           (res.CheckOut BETWEEN %s AND %s)
    )
    LIMIT 5
    """
-   cursor.execute(query, (total_persons, end_date, begin_date))
+   cursor.execute(query, (total_persons, begin_date, end_date, begin_date, end_date))
    suggested_rooms = cursor.fetchall()
 
    cursor.close()
@@ -319,11 +326,7 @@ def detailed_res_info(conn):
         res.room like %s and
         res.code like %s;
     """
-    print([first_name, last_name, 
-                    begin_date, end_date, begin_date,
-                    end_date, begin_date, end_date, 
-                    begin_date, end_date, 
-                    room_code, res_code])
+    
     cursor.execute(query, [first_name, last_name, 
                     begin_date, end_date, begin_date,
                     end_date, begin_date, end_date, 
