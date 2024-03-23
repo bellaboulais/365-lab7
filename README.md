@@ -4,6 +4,6 @@
 Bella Boulais, Andrew Chan, Melanie Huang
 
 ## Runtime instructions
-'python3 365-lab7'
+'python3 365-lab7.py'
 
 ## Known bugs / deficiences
